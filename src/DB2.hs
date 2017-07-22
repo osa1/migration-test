@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs              #-}
 
 -- | Log table gets a "severity" column. Existing logs get "DEBUG" severity.
+-- Creates an index for log table's "when" column.
 module DB2 where
 
 --------------------------------------------------------------------------------
@@ -108,6 +109,10 @@ upgrade = do
 
     -- remove backup table
     dropTable (DB1.logTbl "logs_old")
+
+    -- create index
+    void $ liftIO $
+      runStmt db "CREATE INDEX log_index ON logs (\"when\")" []
 
 downgrade :: SeldaM ()
 downgrade = do
