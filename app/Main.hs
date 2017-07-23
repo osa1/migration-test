@@ -5,5 +5,5 @@ import qualified DB2
 
 main :: IO ()
 main = do
-  -- DB1.testMigration >>= print
-  DB2.testMigration >>= print
+  DB1.testMigration >>= print
+  -- DB2.testMigration >>= print

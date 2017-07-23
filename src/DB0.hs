@@ -7,13 +7,15 @@ import qualified Data.Aeson as JSON
 import Data.Aeson.Lens
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import Data.List.Split (chunksOf)
 import Data.Maybe
 import Data.String
-import Data.List.Split (chunksOf)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
 --------------------------------------------------------------------------------
 import Database.Selda
+--------------------------------------------------------------------------------
+import Version
 --------------------------------------------------------------------------------
 
 data Log = Log
@@ -29,7 +31,9 @@ logTblName :: IsString s => s
 logTblName = "logs"
 
 createDb :: SeldaM ()
-createDb = createTable (logTbl logTblName)
+createDb = do
+    createTable (logTbl logTblName)
+    createVersionTbl
 
 insertLogs :: [Log] -> SeldaM ()
 insertLogs logs =

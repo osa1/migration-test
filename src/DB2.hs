@@ -25,6 +25,7 @@ import Database.Selda.Backend
 import Database.Selda.SQLite
 --------------------------------------------------------------------------------
 import qualified DB1
+import Version
 --------------------------------------------------------------------------------
 
 data Severity = DEBUG | INFO | WARN
@@ -94,6 +95,8 @@ upgrade :: SeldaM ()
 upgrade = do
     db <- seldaBackend
 
+    assertVersion 1
+
     -- rename old table
     void $ liftIO $
       runStmt db ("ALTER TABLE " <> DB1.logTblName <> " RENAME TO logs_old") []
@@ -114,9 +117,15 @@ upgrade = do
     void $ liftIO $
       runStmt db "CREATE INDEX log_index ON logs (\"when\")" []
 
+    -- update version number
+    bumpVersion
+    assertVersion 2
+
 downgrade :: SeldaM ()
 downgrade = do
     db <- seldaBackend
+
+    assertVersion 2
 
     -- rename DB2's log table
     void $ liftIO $
@@ -134,6 +143,10 @@ downgrade = do
 
     -- remove backup table
     dropTable (logTbl "logs_old")
+
+    -- update version number
+    downVersion
+    assertVersion 1
 
 --------------------------------------------------------------------------------
 testMigration :: IO Bool
@@ -156,13 +169,17 @@ testMigration = checkSequential $ Group
 migration_prop_1 :: Property
 migration_prop_1 = property $ do
     logs <- forAll DB1.genLogs
-    logs' <- liftIO $ withSQLite ":memory:" $ do
+    (new_logs, old_ver, new_ver) <- liftIO $ withSQLite ":memory:" $ do
       DB1.createDb
       DB1.insertLogs logs
+      old_ver <- getVersion
       upgrade
       downgrade
-      DB1.getLogs DB1.logTblName
-    logs === logs'
+      new_ver <- getVersion
+      new_logs <- DB1.getLogs DB1.logTblName
+      return (new_logs, old_ver, new_ver)
+    logs === new_logs
+    old_ver === new_ver
 
 -- | Upgrade preserves data:
 --
@@ -174,12 +191,16 @@ migration_prop_1 = property $ do
 migration_prop_2 :: Property
 migration_prop_2 = property $ do
     logs <- forAll DB1.genLogs
-    logs' <- liftIO $ withSQLite ":memory:" $ do
+    (new_logs, old_ver, new_ver) <- liftIO $ withSQLite ":memory:" $ do
       DB1.createDb
       DB1.insertLogs logs
+      old_ver <- getVersion
       upgrade
-      getLogs logTblName
-    map toDB2Log logs === logs'
+      new_ver <- getVersion
+      new_logs <- getLogs logTblName
+      return (new_logs, old_ver, new_ver)
+    map toDB2Log logs === new_logs
+    old_ver === new_ver
 
 toDB2Log :: DB1.Log -> Log
 toDB2Log DB1.Log{..} = Log _who _when DEBUG _msg

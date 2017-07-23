@@ -20,6 +20,7 @@ library
     DB0
     DB1
     DB2
+    Version
 
   build-depends:
     aeson,
@@ -32,12 +33,14 @@ library
     selda-sqlite,
     split,
     text,
-    time
+    time,
+    vector
 
   default-language:    Haskell2010
   default-extensions:
-    RecordWildCards
+    LambdaCase
     OverloadedStrings
+    RecordWildCards
     ScopedTypeVariables
     TypeOperators
   ghc-options:         -Wall -O2

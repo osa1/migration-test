@@ -21,6 +21,7 @@ import Database.Selda.Backend
 import Database.Selda.SQLite
 --------------------------------------------------------------------------------
 import qualified DB0
+import Version
 --------------------------------------------------------------------------------
 
 logTbl :: TableName -> Table (T.Text :*: UTCTime :*: T.Text)
@@ -60,6 +61,8 @@ upgrade :: SeldaM ()
 upgrade = do
     db <- seldaBackend
 
+    assertVersion 0
+
     -- rename old table
     void $ liftIO $
       runStmt db ("ALTER TABLE " <> DB0.logTblName <> " RENAME TO logs_old") []
@@ -76,9 +79,15 @@ upgrade = do
     -- remove backup table
     dropTable (DB0.logTbl "logs_old")
 
+    -- update version number
+    bumpVersion
+    assertVersion 1
+
 downgrade :: SeldaM ()
 downgrade = do
     db <- seldaBackend
+
+    assertVersion 1
 
     -- rename DB1's log table
     void $ liftIO $
@@ -95,6 +104,10 @@ downgrade = do
 
     -- remove backup table
     dropTable (logTbl "logs_old")
+
+    -- update version number
+    downVersion
+    assertVersion 0
 
 --------------------------------------------------------------------------------
 testMigration :: IO Bool
@@ -129,13 +142,17 @@ genLogs = list (linear 0 10000) genLog
 migration_prop_1 :: Property
 migration_prop_1 = property $ do
     logs <- forAll genLogs
-    logs' <- liftIO $ withSQLite ":memory:" $ do
+    (new_logs, old_ver, new_ver) <- liftIO $ withSQLite ":memory:" $ do
       DB0.createDb
       DB0.insertLogs logs
+      old_ver <- getVersion
       upgrade
       downgrade
-      DB0.getLogs DB0.logTblName
-    logs === logs'
+      new_ver <- getVersion
+      new_logs <- DB0.getLogs DB0.logTblName
+      return (new_logs, old_ver, new_ver)
+    logs === new_logs
+    old_ver === new_ver
 
 -- | Upgrade preserves data:
 --
@@ -147,9 +164,13 @@ migration_prop_1 = property $ do
 migration_prop_2 :: Property
 migration_prop_2 = property $ do
     logs <- forAll genLogs
-    logs' <- liftIO $ withSQLite ":memory:" $ do
+    (new_logs, old_ver, new_ver) <- liftIO $ withSQLite ":memory:" $ do
       DB0.createDb
       DB0.insertLogs logs
+      old_ver <- getVersion
       upgrade
-      getLogs logTblName
-    logs === logs'
+      new_ver <- getVersion
+      new_logs <- getLogs logTblName
+      return (new_logs, old_ver, new_ver)
+    logs === new_logs
+    old_ver + 1 === new_ver
