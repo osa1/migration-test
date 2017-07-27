@@ -33,7 +33,7 @@ logTblName = "logs"
 createDb :: SeldaM ()
 createDb = do
     createTable (logTbl logTblName)
-    createVersionTbl
+    createVersionTbl 0
 
 insertLogs :: [Log] -> SeldaM ()
 insertLogs logs =

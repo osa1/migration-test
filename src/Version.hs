@@ -24,10 +24,10 @@ instance SqlType DbVersion where
 versionTbl :: Table DbVersion
 versionTbl = table "version" (required "version")
 
-createVersionTbl :: SeldaM ()
-createVersionTbl = do
+createVersionTbl :: DbVersion -> SeldaM ()
+createVersionTbl ver = do
     createTable versionTbl
-    insert_ versionTbl [0]
+    insert_ versionTbl [ver]
 
 getVersion :: SeldaM DbVersion
 getVersion =

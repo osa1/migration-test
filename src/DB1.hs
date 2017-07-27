@@ -31,7 +31,9 @@ logTblName :: IsString s => s
 logTblName = "logs"
 
 createDb :: SeldaM ()
-createDb = createTable (logTbl logTblName)
+createDb = do
+    createTable (logTbl logTblName)
+    createVersionTbl 1
 
 getLogs :: TableName -> SeldaM [DB0.Log]
 getLogs tbl_name = do

@@ -18,6 +18,8 @@ import Data.Time
 import Data.Typeable
 import GHC.Generics (Generic)
 import Hedgehog
+import Hedgehog.Gen hiding (map)
+import Hedgehog.Range
 import Prelude hiding (init, max, min)
 --------------------------------------------------------------------------------
 import Database.Selda hiding (text)
@@ -65,7 +67,9 @@ logTblName :: IsString s => s
 logTblName = "logs"
 
 createDb :: SeldaM ()
-createDb = createTable (logTbl logTblName)
+createDb = do
+    createTable (logTbl logTblName)
+    createVersionTbl 2
 
 insertLogs :: [Log] -> SeldaM ()
 insertLogs logs =
@@ -200,7 +204,21 @@ migration_prop_2 = property $ do
       new_logs <- getLogs logTblName
       return (new_logs, old_ver, new_ver)
     map toDB2Log logs === new_logs
-    old_ver === new_ver
+    old_ver + 1 === new_ver
 
 toDB2Log :: DB1.Log -> Log
 toDB2Log DB1.Log{..} = Log _who _when DEBUG _msg
+
+genLogs :: Gen [DB2.Log]
+genLogs = list (linear 0 10000) genLog
+
+genLog :: Gen DB2.Log
+genLog = do
+    who <- text (linear 1 10) (element ['a' .. 'z'])
+    day <- fromGregorian <$> integral (linear 1 2000)
+                         <*> integral (linear 1 12)
+                         <*> integral (linear 0 31)
+    dayTime_int :: Int <- integral (linear 0 86401)
+    msg <- text (linear 0 10000) unicode
+    sev <- element [DB2.DEBUG, DB2.INFO, DB2.WARN]
+    return (DB2.Log who (UTCTime day (fromIntegral dayTime_int)) sev msg)
